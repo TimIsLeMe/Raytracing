@@ -2,10 +2,14 @@ import vectors.Vector2;
 import vectors.Vector3;
 
 import java.awt.*;
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.function.Function;
 
 public class Main {
     private static Vector3 eye = new Vector3(0, 0, -4);
@@ -13,10 +17,15 @@ public class Main {
     private static float fov = 0.628319f; // 36 degrees
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
-    private static double p = 0.05;
+    private static double p = 0.1;
     private static float BRDF_LAMBDA = 10f;
     private static float BRDF_EPSILON = 0.01f;
     private static final Random RANDOM = new Random();
+
+    private static final Function<Vector3, Vector3> testMaterial = (Vector3 p) -> {
+        var cyan = convertSrgbToLinRgb(Color.CYAN);
+        return convertSrgbToLinRgb(Color.WHITE).multiply(Math.cos((p.x() + p.y()) * 2 * Math.PI));
+    };
 
     public static void main(String[] args) {
         JFrame f = new JFrame();
@@ -40,6 +49,28 @@ public class Main {
         f.pack();
         f.setVisible(true);
         render(panel, bi, WIDTH, HEIGHT);
+//        paintImage(panel, bi, WIDTH, HEIGHT);
+//        panel.repaint();
+    }
+
+    public static void paintImage(JPanel panel, BufferedImage bi, int width, int height) {
+        BufferedImage image = null;
+        try {
+            File pathToFile = new File("resources/MinecraftGlowstone.jpg");
+            image = ImageIO.read(pathToFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+//                Vector3 c = testMaterial.apply(new Vector3(x, y, 0));
+//                int color = convertLinRgbToInt(c.x(), c.y(), c.z());
+                int color = image.getRGB(x, y);
+                var c = convertIntToSRgb(color);
+                color = convertSRgbToInt(c);
+                bi.setRGB(x, y, 1, 1, new int[] {color}, 0, width);
+            }
+        }
     }
 
     public static void setScene(List<Renderable> sceneObjects) {
@@ -51,19 +82,20 @@ public class Main {
         var white = convertSrgbToLinRgb(Color.WHITE);
         var yellow = convertSrgbToLinRgb(Color.YELLOW);
         var cyan = convertSrgbToLinRgb(Color.CYAN);
-        sceneObjects.add(new Sphere(new Vector3(-1001, 0, 0), 1000, red, black));
-        sceneObjects.add(new Sphere(new Vector3(1001, 0, 0), 1000, blue, black));
-        sceneObjects.add(new Sphere(new Vector3(0, 0, 1001), 1000, gray, black));
-        sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, lightGray, black));
-        sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, white, white.multiply(2)));
-        sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, yellow, black));
-        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, cyan, black));
+        sceneObjects.add(new Sphere(new Vector3(-1001, 0, 0), 1000, new Material(red, black)));
+        sceneObjects.add(new Sphere(new Vector3(1001, 0, 0), 1000, new Material(blue, black)));
+        sceneObjects.add(new Sphere(new Vector3(0, 0, 1001), 1000, new Material(gray, black)));
+        sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(lightGray, black)));
+        sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(2))));
+        sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, new Material(yellow, yellow.add(white).multiply(0.1), "resources/MinecraftGlowstone.jpg")));
+        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black)));
     }
 
     public static void render(JPanel panel, BufferedImage bi, int width, int height) {
         int[] rgbArr = new int[1];
         float halfW = ((float) width) / 2f;
         float halfH = ((float) height) / 2f;
+
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 float posX, posY;
@@ -87,35 +119,31 @@ public class Main {
             return color;
         }
         if (getRandomDouble() < p) {
-            return hp.object().emission();
+            return hp.object().getEmission(hp.pos());
         }
         var normal = calculateNormalAtPoint(hp.pos(), hp.object());
         var w = SampleDirection(normal);
         var normD = Vector3.normalize(d);
         var nextO = hp.pos().add(normD.multiply(BRDF_EPSILON));
         var c1 = ComputeColor(nextO, w);
-        var brdf = BRDF(normD, w, hp);
+        var brdf = BRDF(normD, w, hp, normal);
         var c2 = brdf.multiply(Vector3.dot(w, normal) * (Math.PI * 2 / (1 - p)));
-        return color.add(c1.multiply(c2)).add(hp.object().emission());
+//        return hp.object().getColor(hp.pos(), normal);
+        return color.add(c1.multiply(c2)).add(hp.object().getEmission(hp.pos()));
     }
 
     public static Vector3 calculateNormalAtPoint(Vector3 hitPoint, Renderable obj) {
         return Vector3.normalize(Vector3.subtract(hitPoint, obj.position()));
     }
-    public static Vector3 BRDF(Vector3 d, Vector3 w, HitPoint hp) {
+    public static Vector3 BRDF(Vector3 d, Vector3 w, HitPoint hp, Vector3 normal) {
 //        var dr = Vector3.normalize(Vector3.reflect(d, Vector3.UNIT_Y));
         double divPi = 1 / Math.PI;
-        return hp.object().color().multiply(divPi);
+        return hp.object().getColor(hp.pos(), normal).multiply(divPi);
 //        if (Vector3.dot(w, dr) > 1 - BRDF_EPSILON) {
 //            return hp.object().color().multiply(divPi).add(hp.object().emission().multiply(BRDF_LAMBDA));
 //        } else {
 //            return hp.object().color().multiply(divPi);
 //        }
-    }
-
-    public static Vector3 shortenLength(Vector3 a, float reductionLength)
-    {
-        return a.multiply(1 - reductionLength/a.length());
     }
     public static Vector3 SampleDirection(Vector3 normal) {
         // Generate a random direction in a hemisphere
@@ -162,11 +190,21 @@ public class Main {
         return (int) (getGammaCorrection(clipLinRGB(c)) * 255);
     }
 
-    public static Vector3 convertSrgbToLinRgb(Color c) {
-        double red = getInverseGammaCorrection((c.getRed() / 255f));
-        double green = getInverseGammaCorrection((c.getGreen() / 255f));
-        double blue = getInverseGammaCorrection(c.getBlue() / 255f);
+    public static Vector3 convertLinRgbToSrgb(Vector3 c) {
+        return new Vector3(
+                (getGammaCorrection(clipLinRGB(c.x())) * 255),
+                (getGammaCorrection(clipLinRGB(c.y())) * 255),
+                (getGammaCorrection(clipLinRGB(c.z())) * 255));
+    }
+
+    public static Vector3 convertSrgbToLinRgb(Vector3 c) {
+        double red = getInverseGammaCorrection((c.x() / 255f));
+        double green = getInverseGammaCorrection((c.y() / 255f));
+        double blue = getInverseGammaCorrection(c.z() / 255f);
         return new Vector3(red, green, blue);
+    }
+    public static Vector3 convertSrgbToLinRgb(Color c) {
+        return convertSrgbToLinRgb(new Vector3(c.getRed(), c.getGreen(), c.getBlue()));
     }
 
     public static double getInverseGammaCorrection(double c) {
@@ -182,11 +220,31 @@ public class Main {
         return ((red & 0x0ff) << 16) | ((green & 0x0ff) << 8) | (blue & 0x0ff); // conversion to single integer for BufferedImage
     }
 
+    public static int convertSRgbToInt(Vector3 c) {
+        return convertSRgbToInt((int) c.x(), (int) c.y(), (int) c.z());
+    }
+
+    public static Vector3 convertIntToSRgb(int c) {
+        // 255 -> 2^8 each rrrrrrrrggggggggbbbbbbbb
+        int red = (c >> 16) & 0xFF;
+        int green = (c >> 8) & 0xFF;
+        int blue = c & 0xFF;
+        return new Vector3(red, green, blue);
+    }
+
     public static int convertLinRgbToInt(double r, double g, double b) {
         int red = convertLinRgbToSrgb(r);
         int green = convertLinRgbToSrgb(g);
         int blue = convertLinRgbToSrgb(b);
         return convertSRgbToInt(red, green, blue);
+    }
+
+    public static Vector2 translatePointToSphere(Vector3 n, int width, int height) {
+        double s = Math.atan2(n.x(), n.z());
+        double t = Math.acos(n.y());
+        int sInt = (int) ((s + Math.PI) / (Math.PI * 2) * width);
+        int tInt = (int) (t / Math.PI * height);
+        return new Vector2(sInt, tInt);
     }
 
 }

@@ -2,23 +2,13 @@ import vectors.Vector3;
 public class Sphere implements Renderable {
     private Vector3 position;
     private float radius;
-    private Vector3 color;
-    private Vector3 emission;
+    private Material material;
     private Vector3 reflectionMaterial;
 
-    public Sphere(Vector3 position, float radius, Vector3 color, Vector3 emission) {
+    public Sphere(Vector3 position, float radius, Material material) {
         this.position = position;
         this.radius = radius;
-        this.color = color;
-        this.emission = emission;
-    }
-
-    public Sphere(Vector3 position, float radius, Vector3 color, Vector3 emission, Vector3 reflectionMaterial) {
-        this.position = position;
-        this.radius = radius;
-        this.color = color;
-        this.emission = emission;
-        this.reflectionMaterial = reflectionMaterial;
+        this.material = material;
     }
 
     public Hit hit(Vector3 o, Vector3 d) {
@@ -51,10 +41,13 @@ public class Sphere implements Renderable {
     public float radius() {
         return radius;
     }
-    public Vector3 color() {
-        return color;
+    public Vector3 getColor(Vector3 point, Vector3 normal) {
+        return material.getColor(point, normal);
     }
-    public Vector3 emission() {
-        return emission;
+    public Vector3 color() { return material.color(); }
+
+    public Vector3 getEmission(Vector3 p) {
+        // TODO: add option to get emission with method
+        return material.emission();
     }
 }
