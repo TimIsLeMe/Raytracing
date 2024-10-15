@@ -17,7 +17,7 @@ public class Main {
     private static float fov = 0.628319f; // 36 degrees
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
-    private static double p = 0.1;
+    private static double p = 0.3;
     private static float BRDF_LAMBDA = 10f;
     private static float BRDF_EPSILON = 0.01f;
     private static final Random RANDOM = new Random();
@@ -48,7 +48,7 @@ public class Main {
         f.getContentPane().setPreferredSize(new Dimension(WIDTH, HEIGHT));
         f.pack();
         f.setVisible(true);
-        render(panel, bi, WIDTH, HEIGHT);
+        render(panel, bi, WIDTH * 2, HEIGHT * 2, WIDTH, HEIGHT);
 //        paintImage(panel, bi, WIDTH, HEIGHT);
 //        panel.repaint();
     }
@@ -87,15 +87,15 @@ public class Main {
         sceneObjects.add(new Sphere(new Vector3(0, 0, 1001), 1000, new Material(gray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(lightGray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(2))));
-        sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, new Material(yellow, yellow.add(white).multiply(0.1), "resources/MinecraftGlowstone.jpg")));
+        sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 0.5f)));
         sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black)));
     }
 
-    public static void render(JPanel panel, BufferedImage bi, int width, int height) {
+    public static void render(JPanel panel, BufferedImage bi, int width, int height, int originalWidth, int originalHeight) {
         int[] rgbArr = new int[1];
         float halfW = ((float) width) / 2f;
         float halfH = ((float) height) / 2f;
-
+        BufferedImage biRendered = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 float posX, posY;
@@ -106,10 +106,19 @@ public class Main {
                 var c = ComputeColor(originAndDirection.first(), originAndDirection.second());
                 int color = convertLinRgbToInt(c.x(), c.y(), c.z());
                 Arrays.fill(rgbArr, color);
-                bi.setRGB(x, y, 1, 1, rgbArr, 0, width);
+                biRendered.setRGB(x, y, 1, 1, rgbArr, 0, width);
             }
+            drawImageDownscaled(bi, biRendered, originalWidth, originalHeight);
             panel.repaint();
         }
+    }
+
+    public static void drawImageDownscaled(BufferedImage toPaint, BufferedImage original, int width, int height) {
+        Graphics2D g2d = toPaint.createGraphics();
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.drawImage(original, 0, 0, width, height, null);
     }
 
     public static Vector3 ComputeColor(Vector3 o, Vector3 d) {
@@ -128,8 +137,7 @@ public class Main {
         var c1 = ComputeColor(nextO, w);
         var brdf = BRDF(normD, w, hp, normal);
         var c2 = brdf.multiply(Vector3.dot(w, normal) * (Math.PI * 2 / (1 - p)));
-//        return hp.object().getColor(hp.pos(), normal);
-        return color.add(c1.multiply(c2)).add(hp.object().getEmission(hp.pos()));
+        return color.add(c1.multiply(c2)).add(hp.object().getEmission(normal));
     }
 
     public static Vector3 calculateNormalAtPoint(Vector3 hitPoint, Renderable obj) {
@@ -138,11 +146,11 @@ public class Main {
     public static Vector3 BRDF(Vector3 d, Vector3 w, HitPoint hp, Vector3 normal) {
 //        var dr = Vector3.normalize(Vector3.reflect(d, Vector3.UNIT_Y));
         double divPi = 1 / Math.PI;
-        return hp.object().getColor(hp.pos(), normal).multiply(divPi);
+        return hp.object().getColor(normal).multiply(divPi);
 //        if (Vector3.dot(w, dr) > 1 - BRDF_EPSILON) {
-//            return hp.object().color().multiply(divPi).add(hp.object().emission().multiply(BRDF_LAMBDA));
+//            return hp.object().color(normal).multiply(divPi).add(hp.object().emission(normal).multiply(BRDF_LAMBDA));
 //        } else {
-//            return hp.object().color().multiply(divPi);
+//            return hp.object().color(normal).multiply(divPi);
 //        }
     }
     public static Vector3 SampleDirection(Vector3 normal) {
@@ -239,7 +247,7 @@ public class Main {
         return convertSRgbToInt(red, green, blue);
     }
 
-    public static Vector2 translatePointToSphere(Vector3 n, int width, int height) {
+    public static Vector2 translatePointFromSphere(Vector3 n, int width, int height) {
         double s = Math.atan2(n.x(), n.z());
         double t = Math.acos(n.y());
         int sInt = (int) ((s + Math.PI) / (Math.PI * 2) * width);

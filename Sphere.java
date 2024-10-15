@@ -41,13 +41,12 @@ public class Sphere implements Renderable {
     public float radius() {
         return radius;
     }
-    public Vector3 getColor(Vector3 point, Vector3 normal) {
-        return material.getColor(point, normal);
+    public Vector3 getColor(Vector3 normal) {
+        return material.getColor(normal);
     }
     public Vector3 color() { return material.color(); }
 
-    public Vector3 getEmission(Vector3 p) {
-        // TODO: add option to get emission with method
-        return material.emission();
+    public Vector3 getEmission(Vector3 n) {
+        return material.emission(n);
     }
 }

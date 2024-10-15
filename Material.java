@@ -11,29 +11,29 @@ public class Material {
 
     private Vector3 color;
     private Vector3 emission;
+    private float emissionStrength;
     private Vector3 reflection;
-    private Function reflectionType;
+    private Function brdf;
     private String bitmapPath;
     private BufferedImage texture;
-    private Function<Vector3, Vector3> computedColor;
 
     public Material(Vector3 color, Vector3 emission) {
         this.color = color;
         this.emission = emission;
     }
 
-    public Material(Vector3 color, Vector3 emission, String bitmapPath) {
+    public Material(Vector3 color, Vector3 emission, String bitmapPath, float emissionStrength) {
         this.color = color;
         this.emission = emission;
         this.bitmapPath = bitmapPath;
+        this.emissionStrength = emissionStrength;
         setTexture();
     }
-    public Material(Vector3 color, Vector3 emission, Vector3 reflection, Function reflectionType, Function<Vector3, Vector3> computedColor) {
+    public Material(Vector3 color, Vector3 emission, Vector3 reflection, Function brdf) {
         this.color = color;
         this.emission = emission;
         this.reflection = reflection;
-        this.reflectionType = reflectionType;
-        this.computedColor = computedColor;
+        this.brdf = brdf;
     }
 
     public void setTexture() {
@@ -49,18 +49,16 @@ public class Material {
         this.bitmapPath = bitmapPath;
     }
 
-    public Vector3 getColor(Vector3 p, Vector3 normal) {
-        if(bitmapPath != null) {
+    public Vector3 getColor(Vector3 normal) {
+        if(texture != null) {
+            if(emissionStrength <= 0f) return Vector3.ZERO;
             try {
-                Vector2 p2 = Main.translatePointToSphere(normal, texture.getWidth(), texture.getHeight());
-                var c = Main.convertIntToSRgb(texture.getRGB((int) p2.x(), (int) p2.y()));
+                Vector2 p2 = Main.translatePointFromSphere(normal, texture.getWidth(), texture.getHeight());
+                var c = Main.convertIntToSRgb(texture.getRGB((int) p2.x(), (int) p2.y())).multiply(emissionStrength);
                 return Main.convertSrgbToLinRgb(c);
             } catch (IndexOutOfBoundsException e) {
                 e.printStackTrace();
             }
-        }
-        if(computedColor != null) {
-            return computedColor.apply(p);
         }
         return color;
     }
@@ -69,7 +67,16 @@ public class Material {
         return color;
     }
 
-    public Vector3 emission() {
+    public Vector3 emission(Vector3 normal) {
+        if(texture != null) {
+            try {
+                Vector2 p2 = Main.translatePointFromSphere(normal, texture.getWidth(), texture.getHeight());
+                var c = Main.convertIntToSRgb(texture.getRGB((int) p2.x(), (int) p2.y()));
+                return Main.convertSrgbToLinRgb(c);
+            } catch (IndexOutOfBoundsException e) {
+                e.printStackTrace();
+            }
+        }
         return emission;
     }
 
@@ -78,10 +85,6 @@ public class Material {
     }
 
     public Function reflectionType() {
-        return reflectionType;
-    }
-
-    public Function<Vector3, Vector3> computedColor() {
-        return computedColor;
+        return brdf;
     }
 }
