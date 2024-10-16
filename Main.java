@@ -17,10 +17,10 @@ public class Main {
     private static float fov = 0.628319f; // 36 degrees
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
-    private static double p = 0.1;
-    private static int RAYS = 1;
-    public static float BRDF_LAMBDA = 10f;
-    public static float BRDF_EPSILON = 0.01f;
+    private static final double p = 0.2;
+    private static final int RAYS = 4;
+    public static final float BRDF_LAMBDA = 10f;
+    public static final float BRDF_EPSILON = 0.01f;
     private static final Random RANDOM = new Random();
     public static double DIV_PI = 1 / Math.PI;
 
@@ -106,20 +106,21 @@ public class Main {
         }
         var normD = Vector3.normalize(d);
         var w = SampleDirection(normal);
+        var normalW = Vector3.normalize(w);
         var nextO = hp.pos().add(normD.multiply(BRDF_EPSILON));
         var c1 = ComputeColor(nextO, w);
         Vector3 brdf = hp.object().reflectionMethod() != null ?
-                hp.object().reflectionMethod().apply(new Tuple<>(new Vector3[]{normD, w, normal}, hp)) :
-                BRDF(hp, normal);
-        var c2 = brdf.multiply(Vector3.dot(w, normal) * (Math.PI * 2 / (1 - p)));
+                hp.object().reflectionMethod().apply(new Tuple<>(new Vector3[]{normD, normalW, normal}, hp.object())) :
+                BRDF(hp.object(), normal);
+        var c2 = brdf.multiply(Vector3.dot(normalW, normal) * (Math.PI * 2 / (1 - p)));
         return c1.multiply(c2).add(hp.object().getEmission(normal));
     }
 
     public static Vector3 calculateNormalAtPoint(Vector3 hitPoint, Renderable obj) {
         return Vector3.normalize(Vector3.subtract(hitPoint, obj.position()));
     }
-    public static Vector3 BRDF(HitPoint hp, Vector3 normal) {
-        return hp.object().getColor(normal).multiply(DIV_PI);
+    public static Vector3 BRDF(Renderable r, Vector3 normal) {
+        return r.getColor(normal).multiply(DIV_PI);
     }
     public static Vector3 SampleDirection(Vector3 normal) {
         // Generate a random direction in a hemisphere
@@ -127,8 +128,7 @@ public class Main {
         do {
             sample = new Vector3(getRandomDouble() * 2 - 1, getRandomDouble() * 2 - 1, getRandomDouble() * 2 - 1);
         } while (sample.length() > 1 || Vector3.dot(sample, normal) <= 0);
-
-        return Vector3.normalize(sample);
+        return sample;
     }
     public static double getRandomDouble() {
         return RANDOM.nextDouble();

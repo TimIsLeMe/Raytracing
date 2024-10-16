@@ -97,17 +97,17 @@ public class Material {
     public Vector3 specular() {
         return specular;
     }
-    public static Function<Tuple<Vector3[], HitPoint>, Vector3> DefaultReflection = (input) -> {
+    public static Function<Tuple<Vector3[], Renderable>, Vector3> DefaultReflection = (input) -> {
         Vector3 d, w, normal;
-        HitPoint hp = input.second();
+        Renderable r = input.second();
         var vectors = input.first();
         d = vectors[0];
         w = vectors[1];
         normal = vectors[2];
         var dr = Vector3.normalize(Vector3.reflect(d, normal));
-        var color = hp.object().getColor(normal).multiply(Main.DIV_PI);
+        var color = r.getColor(normal).multiply(Main.DIV_PI);
         if (Vector3.dot(w, dr) > 1 - Main.BRDF_EPSILON) {
-            return hp.object().getSpecular().multiply(Main.BRDF_LAMBDA).add(color);
+            return r.getSpecular().multiply(Main.BRDF_LAMBDA).add(color);
         } else {
             return color;
         }
