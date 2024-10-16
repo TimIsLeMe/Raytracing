@@ -1,9 +1,11 @@
 import vectors.Vector3;
+
+import java.util.function.Function;
+
 public class Sphere implements Renderable {
     private Vector3 position;
     private float radius;
     private Material material;
-    private Vector3 reflectionMaterial;
 
     public Sphere(Vector3 position, float radius, Material material) {
         this.position = position;
@@ -32,9 +34,14 @@ public class Sphere implements Renderable {
         return hit;
     }
 
-    public Vector3 reflectionMaterial() {
-        return reflectionMaterial;
+    public Function reflectionMethod() {
+        return material.reflectionMethod();
     }
+
+    public Vector3 getSpecular() {
+        return material.specular();
+    }
+
     public Vector3 position() {
         return position;
     }

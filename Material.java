@@ -5,6 +5,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.function.Function;
 
 public class Material {
@@ -12,8 +13,8 @@ public class Material {
     private Vector3 color;
     private Vector3 emission;
     private float emissionStrength;
-    private Vector3 reflection;
-    private Function brdf;
+    private Vector3 specular;
+    private Function<Tuple<List<Vector3>, HitPoint>, Vector3> brdf;
     private String bitmapPath;
     private BufferedImage texture;
 
@@ -29,10 +30,20 @@ public class Material {
         this.emissionStrength = emissionStrength;
         setTexture();
     }
-    public Material(Vector3 color, Vector3 emission, Vector3 reflection, Function brdf) {
+    public Material(Vector3 color, Vector3 emission, Vector3 specular, Function brdf) {
         this.color = color;
         this.emission = emission;
-        this.reflection = reflection;
+        this.specular = specular;
+        this.brdf = brdf;
+    }
+
+    public Material(Vector3 color, Vector3 emission, String bitmapPath, float emissionStrength, Vector3 specular, Function brdf) {
+        this.color = color;
+        this.emission = emission;
+        this.bitmapPath = bitmapPath;
+        this.emissionStrength = emissionStrength;
+        setTexture();
+        this.specular = specular;
         this.brdf = brdf;
     }
 
@@ -79,12 +90,26 @@ public class Material {
         }
         return emission;
     }
-
-    public Vector3 reflection() {
-        return reflection;
-    }
-
-    public Function reflectionType() {
+    public Function reflectionMethod() {
         return brdf;
     }
+
+    public Vector3 specular() {
+        return specular;
+    }
+    public static Function<Tuple<Vector3[], HitPoint>, Vector3> DefaultReflection = (input) -> {
+        Vector3 d, w, normal;
+        HitPoint hp = input.second();
+        var vectors = input.first();
+        d = vectors[0];
+        w = vectors[1];
+        normal = vectors[2];
+        var dr = Vector3.normalize(Vector3.reflect(d, normal));
+        var color = hp.object().getColor(normal).multiply(Main.DIV_PI);
+        if (Vector3.dot(w, dr) > 1 - Main.BRDF_EPSILON) {
+            return hp.object().getSpecular().multiply(Main.BRDF_LAMBDA).add(color);
+        } else {
+            return color;
+        }
+    };
 }

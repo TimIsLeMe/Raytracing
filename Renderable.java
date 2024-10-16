@@ -1,9 +1,13 @@
 import vectors.Vector3;
 
+import java.util.function.Function;
+
 public interface Renderable {
+    Vector3 position();
     Hit hit(Vector3 o, Vector3 d);
     Vector3 getColor(Vector3 n);
     Vector3 getEmission(Vector3 n);
-    Vector3 position();
-    Vector3 reflectionMaterial();
+    Vector3 getSpecular();
+    Function<Object, Vector3> reflectionMethod();
+
 }

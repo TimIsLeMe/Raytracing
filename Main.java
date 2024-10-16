@@ -17,10 +17,12 @@ public class Main {
     private static float fov = 0.628319f; // 36 degrees
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
-    private static double p = 0.3;
-    private static float BRDF_LAMBDA = 10f;
-    private static float BRDF_EPSILON = 0.01f;
+    private static double p = 0.1;
+    private static int RAYS = 1;
+    public static float BRDF_LAMBDA = 10f;
+    public static float BRDF_EPSILON = 0.01f;
     private static final Random RANDOM = new Random();
+    public static double DIV_PI = 1 / Math.PI;
 
     private static final Function<Vector3, Vector3> testMaterial = (Vector3 p) -> {
         var cyan = convertSrgbToLinRgb(Color.CYAN);
@@ -48,29 +50,7 @@ public class Main {
         f.getContentPane().setPreferredSize(new Dimension(WIDTH, HEIGHT));
         f.pack();
         f.setVisible(true);
-        render(panel, bi, WIDTH * 2, HEIGHT * 2, WIDTH, HEIGHT);
-//        paintImage(panel, bi, WIDTH, HEIGHT);
-//        panel.repaint();
-    }
-
-    public static void paintImage(JPanel panel, BufferedImage bi, int width, int height) {
-        BufferedImage image = null;
-        try {
-            File pathToFile = new File("resources/MinecraftGlowstone.jpg");
-            image = ImageIO.read(pathToFile);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-//                Vector3 c = testMaterial.apply(new Vector3(x, y, 0));
-//                int color = convertLinRgbToInt(c.x(), c.y(), c.z());
-                int color = image.getRGB(x, y);
-                var c = convertIntToSRgb(color);
-                color = convertSRgbToInt(c);
-                bi.setRGB(x, y, 1, 1, new int[] {color}, 0, width);
-            }
-        }
+        render(panel, bi, WIDTH, HEIGHT);
     }
 
     public static void setScene(List<Renderable> sceneObjects) {
@@ -82,20 +62,20 @@ public class Main {
         var white = convertSrgbToLinRgb(Color.WHITE);
         var yellow = convertSrgbToLinRgb(Color.YELLOW);
         var cyan = convertSrgbToLinRgb(Color.CYAN);
+        var pink = convertSrgbToLinRgb(Color.PINK);
         sceneObjects.add(new Sphere(new Vector3(-1001, 0, 0), 1000, new Material(red, black)));
         sceneObjects.add(new Sphere(new Vector3(1001, 0, 0), 1000, new Material(blue, black)));
         sceneObjects.add(new Sphere(new Vector3(0, 0, 1001), 1000, new Material(gray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(lightGray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(2))));
-        sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 0.5f)));
-        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black)));
+        sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 1f)));
+        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black, white, Material.DefaultReflection)));
     }
 
-    public static void render(JPanel panel, BufferedImage bi, int width, int height, int originalWidth, int originalHeight) {
+    public static void render(JPanel panel, BufferedImage bi, int width, int height) {
         int[] rgbArr = new int[1];
         float halfW = ((float) width) / 2f;
         float halfH = ((float) height) / 2f;
-        BufferedImage biRendered = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 float posX, posY;
@@ -103,55 +83,43 @@ public class Main {
                 posY = (y - halfH) / halfH;
                 Vector2 geoPos = new Vector2(posX, posY);
                 var originAndDirection = createEyeRay(eye, lookAt, fov, geoPos);
-                var c = ComputeColor(originAndDirection.first(), originAndDirection.second());
+                Vector3 c = Vector3.ZERO;
+                for(int i = 0; i < RAYS; i++) {
+                    c = c.add(ComputeColor(originAndDirection.first(), originAndDirection.second()));
+                }
+                c = c.multiply(1f / RAYS);
                 int color = convertLinRgbToInt(c.x(), c.y(), c.z());
                 Arrays.fill(rgbArr, color);
-                biRendered.setRGB(x, y, 1, 1, rgbArr, 0, width);
+                bi.setRGB(x, y, 1, 1, rgbArr, 0, width);
             }
-            drawImageDownscaled(bi, biRendered, originalWidth, originalHeight);
             panel.repaint();
         }
     }
-
-    public static void drawImageDownscaled(BufferedImage toPaint, BufferedImage original, int width, int height) {
-        Graphics2D g2d = toPaint.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2d.drawImage(original, 0, 0, width, height, null);
-    }
-
     public static Vector3 ComputeColor(Vector3 o, Vector3 d) {
-        Vector3 color = Vector3.ZERO;
         var hp = findClosestHitPoint(o, d);
         if (hp == null) {
-            return color;
-        }
-        if (getRandomDouble() < p) {
-            return hp.object().getEmission(hp.pos());
+            return Vector3.ZERO;
         }
         var normal = calculateNormalAtPoint(hp.pos(), hp.object());
-        var w = SampleDirection(normal);
+        if (getRandomDouble() < p) {
+            return hp.object().getEmission(normal);
+        }
         var normD = Vector3.normalize(d);
+        var w = SampleDirection(normal);
         var nextO = hp.pos().add(normD.multiply(BRDF_EPSILON));
         var c1 = ComputeColor(nextO, w);
-        var brdf = BRDF(normD, w, hp, normal);
+        Vector3 brdf = hp.object().reflectionMethod() != null ?
+                hp.object().reflectionMethod().apply(new Tuple<>(new Vector3[]{normD, w, normal}, hp)) :
+                BRDF(hp, normal);
         var c2 = brdf.multiply(Vector3.dot(w, normal) * (Math.PI * 2 / (1 - p)));
-        return color.add(c1.multiply(c2)).add(hp.object().getEmission(normal));
+        return c1.multiply(c2).add(hp.object().getEmission(normal));
     }
 
     public static Vector3 calculateNormalAtPoint(Vector3 hitPoint, Renderable obj) {
         return Vector3.normalize(Vector3.subtract(hitPoint, obj.position()));
     }
-    public static Vector3 BRDF(Vector3 d, Vector3 w, HitPoint hp, Vector3 normal) {
-//        var dr = Vector3.normalize(Vector3.reflect(d, Vector3.UNIT_Y));
-        double divPi = 1 / Math.PI;
-        return hp.object().getColor(normal).multiply(divPi);
-//        if (Vector3.dot(w, dr) > 1 - BRDF_EPSILON) {
-//            return hp.object().color(normal).multiply(divPi).add(hp.object().emission(normal).multiply(BRDF_LAMBDA));
-//        } else {
-//            return hp.object().color(normal).multiply(divPi);
-//        }
+    public static Vector3 BRDF(HitPoint hp, Vector3 normal) {
+        return hp.object().getColor(normal).multiply(DIV_PI);
     }
     public static Vector3 SampleDirection(Vector3 normal) {
         // Generate a random direction in a hemisphere
@@ -162,13 +130,13 @@ public class Main {
 
         return Vector3.normalize(sample);
     }
-
-    public static float getRandomFloat() {
-        return RANDOM.nextFloat() * 2f;
-    }
     public static double getRandomDouble() {
-        return RANDOM.nextDouble() * 2;
+        return RANDOM.nextDouble();
     }
+    public static float getRandomFloat() {
+        return RANDOM.nextFloat();
+    }
+
     public static Tuple<Vector3, Vector3> createEyeRay(Vector3 eye, Vector3 lookAt, float fov, Vector2 pixel) { // returns origin point and direction
         var f = Vector3.normalize(Vector3.subtract(lookAt, eye));
         var r = Vector3.normalize(Vector3.cross(Vector3.UNIT_Y, f));
@@ -184,8 +152,8 @@ public class Main {
             var hit = obj.hit(o ,d);
             if(hit != null) hits.add(hit);
         }
-        hits.sort(Comparator.comparing(Hit::lambda));
         if (hits.size() > 0) {
+            hits.sort(Comparator.comparing(Hit::lambda));
             return hits.get(0).hitpoint();
         } else return null;
     }
