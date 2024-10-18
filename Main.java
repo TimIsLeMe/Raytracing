@@ -69,7 +69,7 @@ public class Main {
         sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(lightGray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(2))));
         sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 1f)));
-        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black, cyan.multiply(1.1), Material.DefaultReflection)));
+        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black, white, Material.DefaultReflection)));
     }
 
     public static void setSceneCustom1(List<Renderable> sceneObjects) {
@@ -132,14 +132,14 @@ public class Main {
         if (hp == null) {
             return Vector3.ZERO;
         }
-        var normal = calculateNormalAtPoint(hp.pos(), hp.object());
+        var normD = Vector3.normalize(d);
+        var nextO = hp.pos().add(normD.multiply(BRDF_EPSILON));
+        var normal = calculateNormalAtPoint(nextO, hp.object());
         if (getRandomDouble() < p) {
             return hp.object().getEmission(normal);
         }
-        var normD = Vector3.normalize(d);
         var w = SampleDirection(normal);
         var normW = Vector3.normalize(w);
-        var nextO = hp.pos().add(normD.multiply(BRDF_EPSILON));
         var c1 = ComputeColor(nextO, w);
         Vector3 brdf = hp.object().reflectionMethod() != null ?
                 hp.object().reflectionMethod().apply(new Tuple<>(new Vector3[]{normD, normW, normal}, hp.object())) :
