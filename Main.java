@@ -18,7 +18,7 @@ public class Main {
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
     private static final double p = 0.3;
-    private static final int RAYS = 8;
+    private static final int RAYS = 32;
     private static final float STD_DEVIATION = 0.5f;
     public static final float BRDF_LAMBDA = 10f;
     public static final float BRDF_EPSILON = 0.01f;
@@ -37,8 +37,6 @@ public class Main {
         f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         BufferedImage bi = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
         scene = new ArrayList<>();
-        setScene(scene);
-
         JPanel panel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -51,6 +49,7 @@ public class Main {
         f.getContentPane().setPreferredSize(new Dimension(WIDTH, HEIGHT));
         f.pack();
         f.setVisible(true);
+        setScene(scene);
         render(panel, bi, WIDTH, HEIGHT);
     }
 
@@ -70,7 +69,30 @@ public class Main {
         sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(lightGray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(2))));
         sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 1f)));
-        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black, yellow, Material.DefaultReflection)));
+        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black, cyan.multiply(1.1), Material.DefaultReflection)));
+    }
+
+    public static void setSceneCustom1(List<Renderable> sceneObjects) {
+        eye = new Vector3(5, 1, -4);
+        lookAt = new Vector3(-2.5, -0.5f, 4);
+        var black = convertSrgbToLinRgb(Color.BLACK);
+        var gray = convertSrgbToLinRgb(Color.GRAY);
+        var white = convertSrgbToLinRgb(Color.WHITE);
+        var yellow = convertSrgbToLinRgb(Color.YELLOW);
+        sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(gray, black)));
+        sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(0.1))));
+        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(yellow, black, "resources/Tigerstone.jpg", 0f, yellow, Material.DefaultReflection)));
+        sceneObjects.add(new Sphere(new Vector3(-1750, -150, 2600), 100f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 2f)));
+    }
+
+    public static void setSceneCustom2(List<Renderable> sceneObjects) {
+        var black = convertSrgbToLinRgb(Color.BLACK);
+        var cyan = convertSrgbToLinRgb(Color.CYAN).multiply(0.7);
+        var yellow = convertSrgbToLinRgb(Color.YELLOW);
+        var pink = convertSrgbToLinRgb(Color.PINK);
+        sceneObjects.add(new Sphere(new Vector3(0, 0, 1001), 1000, new Material(cyan, black)));
+        sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(pink, black)));
+        sceneObjects.add(new Sphere(new Vector3(0, -1, 0.4), 0.7f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 2f)));
     }
 
     public static void render(JPanel panel, BufferedImage bi, int width, int height) {
