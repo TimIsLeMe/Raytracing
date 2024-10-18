@@ -15,8 +15,8 @@ public class Main {
     private static float fovHalfTan = (float) Math.tan(fov / 2);
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
-    private static final double p = 0.2;
-    private static final int RAYS = 64;
+    private static final double p = 0.4;
+    private static final int RAYS = 1024;
     private static final float STD_DEVIATION = 0.5f;
     public static final float BRDF_LAMBDA = 10f;
     public static final float BRDF_EPSILON = 0.01f;
@@ -47,7 +47,7 @@ public class Main {
         f.getContentPane().setPreferredSize(new Dimension(WIDTH, HEIGHT));
         f.pack();
         f.setVisible(true);
-        setScene(scene);
+        setSceneCustom1(scene);
         render(panel, bi, WIDTH, HEIGHT);
     }
 
@@ -79,7 +79,8 @@ public class Main {
         var yellow = convertSrgbToLinRgb(Color.YELLOW);
         sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(gray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(0.1))));
-        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(yellow, black, "resources/Tigerstone.jpg", 0f, yellow)));
+        sceneObjects.add(new Sphere(new Vector3(1, -0.4, 1.5), 0.5f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 1.2f)));
+        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(yellow, black, "resources/Tigerstone.jpg", 0f, yellow.multiply(0.4))));
         sceneObjects.add(new Sphere(new Vector3(-1750, -150, 2600), 100f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 2f)));
     }
 
@@ -138,7 +139,7 @@ public class Main {
         var w = SampleDirection(normal);
         var normW = Vector3.normalize(w);
         var cR = ComputeColor(nextO, w);
-        var brdf = hp.object().getSpecular() != null ? BRDF(normD, normW, normal, hp.object()) : BRDF(normal, hp.object());
+        var brdf = hp.object().getSpecular(normal) != null ? BRDF(normD, normW, normal, hp.object()) : BRDF(normal, hp.object());
         double cFactor = Vector3.dot(normW, normal) * (Math.PI * 2 / (1 - p));
         var color = cR.multiply(brdf.multiply(cFactor));
         return color.add(hp.object().getEmission(normal));
@@ -152,7 +153,7 @@ public class Main {
         var dr = Vector3.normalize(Vector3.reflect(wi, normal));
         var color = r.getColor(normal).multiply(Main.DIV_PI);
         if (Vector3.dot(wo, dr) > 1 - Main.BRDF_EPSILON) {
-            return r.getSpecular().multiply(Main.BRDF_LAMBDA).add(color);
+            return r.getSpecular(normal).multiply(Main.BRDF_LAMBDA).add(color);
         } else {
             return color;
         }

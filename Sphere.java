@@ -33,8 +33,8 @@ public class Sphere implements Renderable {
         }
         return hit;
     }
-    public Vector3 getSpecular() {
-        return material.specular();
+    public Vector3 getSpecular(Vector3 normal) {
+        return material.specular(normal);
     }
     public Vector3 position() {
         return position;

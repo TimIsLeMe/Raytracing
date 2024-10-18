@@ -89,22 +89,16 @@ public class Material {
         }
         return emission;
     }
-    public Vector3 specular() {
+    public Vector3 specular(Vector3 normal) {
+        if(texture != null) {
+            try {
+                Vector2 p2 = Main.translatePointFromSphere(normal, texture.getWidth(), texture.getHeight());
+                var c = Main.convertIntToSRgb(texture.getRGB((int) p2.x(), (int) p2.y()));
+                return Main.convertSrgbToLinRgb(c);
+            } catch (IndexOutOfBoundsException e) {
+                e.printStackTrace();
+            }
+        }
         return specular;
     }
-//    public static Function<Tuple<Vector3[], Renderable>, Vector3> DefaultReflection = (input) -> {
-//        Vector3 d, w, normal;
-//        Renderable r = input.second();
-//        var vectors = input.first();
-//        d = vectors[0];
-//        w = vectors[1];
-//        normal = vectors[2];
-//        var dr = Vector3.normalize(Vector3.reflect(d, normal));
-//        var color = r.getColor(normal).multiply(Main.DIV_PI);
-//        if (Vector3.dot(w, dr) > 1 - Main.BRDF_EPSILON) {
-//            return r.getSpecular().multiply(Main.BRDF_LAMBDA).add(color);
-//        } else {
-//            return color;
-//        }
-//    };
 }
