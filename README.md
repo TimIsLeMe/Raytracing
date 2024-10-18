@@ -1,4 +1,4 @@
-Computer Science Bachelor Class Raytracing: <br>
+Raytracing from a Computer Graphics Class <br>
 
 ![Alt text](images/custom1.png?raw=true "Title")
 ![Alt text](images/custom2.png?raw=true "Title")
