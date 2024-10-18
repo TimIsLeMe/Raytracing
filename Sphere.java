@@ -33,15 +33,9 @@ public class Sphere implements Renderable {
         }
         return hit;
     }
-
-    public Function reflectionMethod() {
-        return material.reflectionMethod();
-    }
-
     public Vector3 getSpecular() {
         return material.specular();
     }
-
     public Vector3 position() {
         return position;
     }

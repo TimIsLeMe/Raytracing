@@ -8,6 +8,5 @@ public interface Renderable {
     Vector3 getColor(Vector3 n);
     Vector3 getEmission(Vector3 n);
     Vector3 getSpecular();
-    Function<Object, Vector3> reflectionMethod();
 
 }

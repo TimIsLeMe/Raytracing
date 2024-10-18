@@ -2,10 +2,7 @@ import vectors.Vector2;
 import vectors.Vector3;
 
 import java.awt.*;
-import java.io.File;
-import java.io.IOException;
 import java.util.*;
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -15,10 +12,11 @@ public class Main {
     private static Vector3 eye = new Vector3(0, 0, -4);
     private static Vector3 lookAt = new Vector3(0, 0, 6);
     private static float fov = 0.628319f; // 36 degrees
+    private static float fovHalfTan = (float) Math.tan(fov / 2);
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
-    private static final double p = 0.3;
-    private static final int RAYS = 32;
+    private static final double p = 0.4;
+    private static final int RAYS = 4096;
     private static final float STD_DEVIATION = 0.5f;
     public static final float BRDF_LAMBDA = 10f;
     public static final float BRDF_EPSILON = 0.01f;
@@ -69,7 +67,7 @@ public class Main {
         sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(lightGray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(2))));
         sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 1f)));
-        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black, white, Material.DefaultReflection)));
+        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black, white)));
     }
 
     public static void setSceneCustom1(List<Renderable> sceneObjects) {
@@ -81,7 +79,7 @@ public class Main {
         var yellow = convertSrgbToLinRgb(Color.YELLOW);
         sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(gray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(0.1))));
-        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(yellow, black, "resources/Tigerstone.jpg", 0f, yellow, Material.DefaultReflection)));
+        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(yellow, black, "resources/Tigerstone.jpg", 0f, yellow)));
         sceneObjects.add(new Sphere(new Vector3(-1750, -150, 2600), 100f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 2f)));
     }
 
@@ -91,8 +89,8 @@ public class Main {
         var yellow = convertSrgbToLinRgb(Color.YELLOW);
         var pink = convertSrgbToLinRgb(Color.PINK);
         sceneObjects.add(new Sphere(new Vector3(0, 0, 1001), 1000, new Material(cyan, black)));
-        sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(pink, black)));
-        sceneObjects.add(new Sphere(new Vector3(0, -1, 0.4), 0.7f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 2f)));
+        sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(pink, black, pink)));
+        sceneObjects.add(new Sphere(new Vector3(0, -1, 0.4), 0.7f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 1f)));
     }
 
     public static void render(JPanel panel, BufferedImage bi, int width, int height) {
@@ -123,7 +121,6 @@ public class Main {
         var f = Vector3.normalize(Vector3.subtract(lookAt, eye));
         var r = Vector3.normalize(Vector3.cross(Vector3.UNIT_Y, f));
         var u = Vector3.normalize(Vector3.cross(r, f));
-        float fovHalfTan = (float) Math.tan(fov / 2);
         var d = f.add(r.multiply(pixel.x()).multiply(fovHalfTan).add(u.multiply(fovHalfTan).multiply(pixel.y())));
         return new Tuple<>(eye, Vector3.normalize(d));
     }
@@ -132,35 +129,34 @@ public class Main {
         if (hp == null) {
             return Vector3.ZERO;
         }
-        var normD = Vector3.normalize(d);
-        var nextO = hp.pos().add(normD.multiply(BRDF_EPSILON));
-        var normal = calculateNormalAtPoint(nextO, hp.object());
+        var normal = calculateNormalAtPointForSphere(hp.pos(), hp.object().position());
         if (getRandomDouble() < p) {
             return hp.object().getEmission(normal);
         }
+        var normD = Vector3.normalize(d);
+        var nextO = hp.pos().add(normD.multiply(BRDF_EPSILON));
         var w = SampleDirection(normal);
         var normW = Vector3.normalize(w);
-        var c1 = ComputeColor(nextO, w);
-        Vector3 brdf = hp.object().reflectionMethod() != null ?
-                hp.object().reflectionMethod().apply(new Tuple<>(new Vector3[]{normD, normW, normal}, hp.object())) :
-                BRDF(normal, hp.object());
-        var c2 = brdf.multiply(Vector3.dot(normW, normal) * (Math.PI * 2 / (1 - p)));
-        return c1.multiply(c2).add(hp.object().getEmission(normal));
+        var cR = ComputeColor(nextO, w);
+        var brdf = hp.object().getSpecular() != null ? BRDF(normD, normW, normal, hp.object()) : BRDF(normal, hp.object());
+        double cFactor = Vector3.dot(normW, normal) * (Math.PI * 2 / (1 - p));
+        var color = cR.multiply(brdf.multiply(cFactor));
+        return color.add(hp.object().getEmission(normal));
     }
 
-    public static Vector3 calculateNormalAtPoint(Vector3 hitPoint, Renderable obj) {
-        return Vector3.normalize(Vector3.subtract(hitPoint, obj.position()));
+    public static Vector3 calculateNormalAtPointForSphere(Vector3 intersectP, Vector3 center) {
+        return Vector3.normalize(Vector3.subtract(intersectP, center));
     }
 
-//    public static Vector3 BRDF(Vector3 d, Vector3 w, Vector3 normal, Renderable r) {
-//        var dr = Vector3.normalize(Vector3.reflect(d, normal));
-//        var color = r.getColor(normal).multiply(Main.DIV_PI);
-//        if (Vector3.dot(w, dr) > 1 - Main.BRDF_EPSILON) {
-//            return r.getSpecular().multiply(Main.BRDF_LAMBDA).add(color);
-//        } else {
-//            return color;
-//        }
-//    }
+    public static Vector3 BRDF(Vector3 wi, Vector3 wo, Vector3 normal, Renderable r) {
+        var dr = Vector3.normalize(Vector3.reflect(wi, normal));
+        var color = r.getColor(normal).multiply(Main.DIV_PI);
+        if (Vector3.dot(wo, dr) > 1 - Main.BRDF_EPSILON) {
+            return r.getSpecular().multiply(Main.BRDF_LAMBDA).add(color);
+        } else {
+            return color;
+        }
+    }
     public static Vector3 BRDF( Vector3 normal, Renderable r) {
         return r.getColor(normal).multiply(DIV_PI);
     }
@@ -169,8 +165,11 @@ public class Main {
         Vector3 sample;
         do {
             sample = new Vector3(getRandomDouble() * 2 - 1, getRandomDouble() * 2 - 1, getRandomDouble() * 2 - 1);
-        } while (sample.length() > 1 || Vector3.dot(sample, normal) <= 0);
-        return sample;
+        } while (sample.lengthSquared() > 1); // if length < 1 then length^2 < 1
+        if (Vector3.dot(sample, normal) <= 0) {
+            sample = sample.negate(); // flip vector if not in hemisphere
+        }
+        return Vector3.normalize(sample);
     }
     public static double getRandomDouble() {
         return RANDOM.nextDouble();
@@ -179,14 +178,17 @@ public class Main {
         return RANDOM.nextFloat();
     }
     public static HitPoint findClosestHitPoint(Vector3 o, Vector3 d) {
-        List<Hit> hits = new ArrayList<>();
+        float minLambda = Float.MAX_VALUE;
+        Hit closestHit = null;
         for (Renderable obj : scene) {
             var hit = obj.hit(o ,d);
-            if(hit != null) hits.add(hit);
+            if(hit != null && hit.lambda() < minLambda) {
+                closestHit = hit;
+                minLambda = hit.lambda();
+            }
         }
-        if (hits.size() > 0) {
-            hits.sort(Comparator.comparing(Hit::lambda));
-            return hits.get(0).hitpoint();
+        if (closestHit != null) {
+            return closestHit.hitpoint();
         } else return null;
     }
 
