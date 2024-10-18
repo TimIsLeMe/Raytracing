@@ -15,8 +15,8 @@ public class Main {
     private static float fovHalfTan = (float) Math.tan(fov / 2);
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
-    private static final double p = 0.4;
-    private static final int RAYS = 4096;
+    private static final double p = 0.2;
+    private static final int RAYS = 64;
     private static final float STD_DEVIATION = 0.5f;
     public static final float BRDF_LAMBDA = 10f;
     public static final float BRDF_EPSILON = 0.01f;
@@ -134,7 +134,7 @@ public class Main {
             return hp.object().getEmission(normal);
         }
         var normD = Vector3.normalize(d);
-        var nextO = hp.pos().add(normD.multiply(BRDF_EPSILON));
+        var nextO = hp.pos().add(normal.multiply(BRDF_EPSILON));
         var w = SampleDirection(normal);
         var normW = Vector3.normalize(w);
         var cR = ComputeColor(nextO, w);
