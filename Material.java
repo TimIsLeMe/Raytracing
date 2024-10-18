@@ -63,11 +63,13 @@ public class Material {
     public Vector3 getColor(Vector3 normal) {
         if(texture != null) {
             if(emissionStrength <= 0f) return Vector3.ZERO;
+            Vector2 p2 = Vector2.ZERO;
             try {
-                Vector2 p2 = Main.translatePointFromSphere(normal, texture.getWidth(), texture.getHeight());
+                p2 = Main.translatePointFromSphere(normal, texture.getWidth(), texture.getHeight());
                 var c = Main.convertIntToSRgb(texture.getRGB((int) p2.x(), (int) p2.y())).multiply(emissionStrength);
                 return Main.convertSrgbToLinRgb(c);
             } catch (IndexOutOfBoundsException e) {
+                System.out.println(p2);
                 e.printStackTrace();
             }
         }

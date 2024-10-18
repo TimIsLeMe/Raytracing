@@ -17,12 +17,13 @@ public class Main {
     private static float fov = 0.628319f; // 36 degrees
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
-    private static final double p = 0.2;
-    private static final int RAYS = 4;
+    private static final double p = 0.3;
+    private static final int RAYS = 32;
+    private static final float STD_DEVIATION = 0.5f;
     public static final float BRDF_LAMBDA = 10f;
     public static final float BRDF_EPSILON = 0.01f;
     private static final Random RANDOM = new Random();
-    public static double DIV_PI = 1 / Math.PI;
+    public static double DIV_PI = 1.0 / Math.PI;
 
     private static final Function<Vector3, Vector3> testMaterial = (Vector3 p) -> {
         var cyan = convertSrgbToLinRgb(Color.CYAN);
@@ -65,11 +66,11 @@ public class Main {
         var pink = convertSrgbToLinRgb(Color.PINK);
         sceneObjects.add(new Sphere(new Vector3(-1001, 0, 0), 1000, new Material(red, black)));
         sceneObjects.add(new Sphere(new Vector3(1001, 0, 0), 1000, new Material(blue, black)));
-        sceneObjects.add(new Sphere(new Vector3(0, 0, 1001), 1000, new Material(gray, black)));
+        sceneObjects.add(new Sphere(new Vector3(0, 0, 1001), 1000, new Material(lightGray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, -1001, 0), 1000, new Material(lightGray, black)));
         sceneObjects.add(new Sphere(new Vector3(0, 1001, 0), 1000, new Material(white, white.multiply(2))));
         sceneObjects.add(new Sphere(new Vector3(-0.6, -0.7, -0.6), 0.3f, new Material(yellow, black, "resources/MinecraftGlowstone.jpg", 1f)));
-        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black, white, Material.DefaultReflection)));
+        sceneObjects.add(new Sphere(new Vector3(0.3, -0.4, 0.3), 0.6f, new Material(cyan, black, yellow, Material.DefaultReflection)));
     }
 
     public static void render(JPanel panel, BufferedImage bi, int width, int height) {
@@ -78,13 +79,19 @@ public class Main {
         float halfH = ((float) height) / 2f;
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                float posX, posY;
-                posX = (x - halfW) / halfW;
-                posY = (y - halfH) / halfH;
-                Vector2 geoPos = new Vector2(posX, posY);
-                var originAndDirection = createEyeRay(eye, lookAt, fov, geoPos);
+//                float posX, posY;
+//                posX = (x - halfW) / halfW;
+//                posY = (y - halfH) / halfH;
+//                Vector2 geoPos = new Vector2(posX, posY);
+
                 Vector3 c = Vector3.ZERO;
                 for(int i = 0; i < RAYS; i++) {
+                    float offsetX = (float) (RANDOM.nextGaussian() * STD_DEVIATION);
+                    float offsetY = (float) (RANDOM.nextGaussian() * STD_DEVIATION);
+                    float posX = (x - halfW + offsetX) / halfW;
+                    float posY = (y - halfH + offsetY) / halfH;
+                    Vector2 geoPos = new Vector2(posX, posY);
+                    var originAndDirection = createEyeRay(eye, lookAt, fov, geoPos);
                     c = c.add(ComputeColor(originAndDirection.first(), originAndDirection.second()));
                 }
                 c = c.multiply(1f / RAYS);
@@ -106,20 +113,30 @@ public class Main {
         }
         var normD = Vector3.normalize(d);
         var w = SampleDirection(normal);
-        var normalW = Vector3.normalize(w);
+        var normW = Vector3.normalize(w);
         var nextO = hp.pos().add(normD.multiply(BRDF_EPSILON));
         var c1 = ComputeColor(nextO, w);
         Vector3 brdf = hp.object().reflectionMethod() != null ?
-                hp.object().reflectionMethod().apply(new Tuple<>(new Vector3[]{normD, normalW, normal}, hp.object())) :
-                BRDF(hp.object(), normal);
-        var c2 = brdf.multiply(Vector3.dot(normalW, normal) * (Math.PI * 2 / (1 - p)));
+                hp.object().reflectionMethod().apply(new Tuple<>(new Vector3[]{normD, normW, normal}, hp.object())) :
+                BRDF(normal, hp.object());
+        var c2 = brdf.multiply(Vector3.dot(normW, normal) * (Math.PI * 2 / (1 - p)));
         return c1.multiply(c2).add(hp.object().getEmission(normal));
     }
 
     public static Vector3 calculateNormalAtPoint(Vector3 hitPoint, Renderable obj) {
         return Vector3.normalize(Vector3.subtract(hitPoint, obj.position()));
     }
-    public static Vector3 BRDF(Renderable r, Vector3 normal) {
+
+//    public static Vector3 BRDF(Vector3 d, Vector3 w, Vector3 normal, Renderable r) {
+//        var dr = Vector3.normalize(Vector3.reflect(d, normal));
+//        var color = r.getColor(normal).multiply(Main.DIV_PI);
+//        if (Vector3.dot(w, dr) > 1 - Main.BRDF_EPSILON) {
+//            return r.getSpecular().multiply(Main.BRDF_LAMBDA).add(color);
+//        } else {
+//            return color;
+//        }
+//    }
+    public static Vector3 BRDF( Vector3 normal, Renderable r) {
         return r.getColor(normal).multiply(DIV_PI);
     }
     public static Vector3 SampleDirection(Vector3 normal) {
@@ -136,7 +153,6 @@ public class Main {
     public static float getRandomFloat() {
         return RANDOM.nextFloat();
     }
-
     public static Tuple<Vector3, Vector3> createEyeRay(Vector3 eye, Vector3 lookAt, float fov, Vector2 pixel) { // returns origin point and direction
         var f = Vector3.normalize(Vector3.subtract(lookAt, eye));
         var r = Vector3.normalize(Vector3.cross(Vector3.UNIT_Y, f));
@@ -218,9 +234,9 @@ public class Main {
     public static Vector2 translatePointFromSphere(Vector3 n, int width, int height) {
         double s = Math.atan2(n.x(), n.z());
         double t = Math.acos(n.y());
-        int sInt = (int) ((s + Math.PI) / (Math.PI * 2) * width);
-        int tInt = (int) (t / Math.PI * height);
+        int sInt = (int) ((s + Math.PI) / (Math.PI * 2) * (width - 1));
+        if(Double.isNaN(t)) t = 0;
+        int tInt = (int) (t / Math.PI * (height - 1));
         return new Vector2(sInt, tInt);
     }
-
 }
