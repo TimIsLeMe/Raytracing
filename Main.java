@@ -18,7 +18,7 @@ public class Main {
     public static List<Renderable> scene;
     private static final int HEIGHT = 650, WIDTH = 650;
     private static final double p = 0.3;
-    private static final int RAYS = 32;
+    private static final int RAYS = 8;
     private static final float STD_DEVIATION = 0.5f;
     public static final float BRDF_LAMBDA = 10f;
     public static final float BRDF_EPSILON = 0.01f;
@@ -79,18 +79,13 @@ public class Main {
         float halfH = ((float) height) / 2f;
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-//                float posX, posY;
-//                posX = (x - halfW) / halfW;
-//                posY = (y - halfH) / halfH;
-//                Vector2 geoPos = new Vector2(posX, posY);
-
+                float posX = (x - halfW) / halfW;
+                float posY = (y - halfH) / halfH;
                 Vector3 c = Vector3.ZERO;
                 for(int i = 0; i < RAYS; i++) {
-                    float offsetX = (float) (RANDOM.nextGaussian() * STD_DEVIATION);
-                    float offsetY = (float) (RANDOM.nextGaussian() * STD_DEVIATION);
-                    float posX = (x - halfW + offsetX) / halfW;
-                    float posY = (y - halfH + offsetY) / halfH;
-                    Vector2 geoPos = new Vector2(posX, posY);
+                    float r1 = (float) (RANDOM.nextGaussian() * STD_DEVIATION);
+                    float r2 = (float) (RANDOM.nextGaussian() * STD_DEVIATION);
+                    Vector2 geoPos = new Vector2(posX + r1 / width, posY + r2 / height);
                     var originAndDirection = createEyeRay(eye, lookAt, fov, geoPos);
                     c = c.add(ComputeColor(originAndDirection.first(), originAndDirection.second()));
                 }
@@ -101,6 +96,14 @@ public class Main {
             }
             panel.repaint();
         }
+    }
+    public static Tuple<Vector3, Vector3> createEyeRay(Vector3 eye, Vector3 lookAt, float fov, Vector2 pixel) { // returns origin point and direction
+        var f = Vector3.normalize(Vector3.subtract(lookAt, eye));
+        var r = Vector3.normalize(Vector3.cross(Vector3.UNIT_Y, f));
+        var u = Vector3.normalize(Vector3.cross(r, f));
+        float fovHalfTan = (float) Math.tan(fov / 2);
+        var d = f.add(r.multiply(pixel.x()).multiply(fovHalfTan).add(u.multiply(fovHalfTan).multiply(pixel.y())));
+        return new Tuple<>(eye, Vector3.normalize(d));
     }
     public static Vector3 ComputeColor(Vector3 o, Vector3 d) {
         var hp = findClosestHitPoint(o, d);
@@ -153,15 +156,6 @@ public class Main {
     public static float getRandomFloat() {
         return RANDOM.nextFloat();
     }
-    public static Tuple<Vector3, Vector3> createEyeRay(Vector3 eye, Vector3 lookAt, float fov, Vector2 pixel) { // returns origin point and direction
-        var f = Vector3.normalize(Vector3.subtract(lookAt, eye));
-        var r = Vector3.normalize(Vector3.cross(Vector3.UNIT_Y, f));
-        var u = Vector3.normalize(Vector3.cross(r, f));
-        float fovHalfTan = (float) Math.tan(fov / 2);
-        var d = f.add(r.multiply(pixel.x()).multiply(fovHalfTan).add(u.multiply(fovHalfTan).multiply(pixel.y())));
-        return new Tuple<>(eye, Vector3.normalize(d));
-    }
-
     public static HitPoint findClosestHitPoint(Vector3 o, Vector3 d) {
         List<Hit> hits = new ArrayList<>();
         for (Renderable obj : scene) {
